@@ -1,3 +1,5 @@
+const _sentinel = Object();
+
 class TileModel {
   String? letter;
   final int row;
@@ -20,23 +22,24 @@ class TileModel {
   });
 
   TileModel copyWith({
-    String? letter,
+    Object? letter = _sentinel,
     int? row,
     int? col,
     bool? isLocked,
     bool? isHighlighted,
     bool? isClueCell,
-    int? clueNumber,
+    Object? clueNumber = _sentinel,
     bool? isBlocked,
   }) {
     return TileModel(
-      letter: letter ?? this.letter,
+      letter: letter == _sentinel ? this.letter : letter as String?,
       row: row ?? this.row,
       col: col ?? this.col,
       isLocked: isLocked ?? this.isLocked,
       isHighlighted: isHighlighted ?? this.isHighlighted,
       isClueCell: isClueCell ?? this.isClueCell,
-      clueNumber: clueNumber ?? this.clueNumber,
+      clueNumber:
+          clueNumber == _sentinel ? this.clueNumber : clueNumber as int?,
       isBlocked: isBlocked ?? this.isBlocked,
     );
   }
