@@ -200,8 +200,9 @@ class _GameScreenState extends State<GameScreen> {
                               ? () => setState(() => _showSwapPanel = true)
                               : null,
                         ),
+  // Fix the icon to match the "Words" label
                         _actionButton(
-                          icon: Icons.help_outline,
+                          icon: Icons.list_alt,
                           label: 'Words',
                           onTap: () => WordPopup.show(context),
                         ),

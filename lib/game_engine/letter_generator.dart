@@ -27,6 +27,9 @@ class LetterGenerator {
   /// Refill [currentHand] to [handSize] letters.
   /// New letters are 60 % puzzle-needed, 40 % random, keeping the game
   /// solvable even after many turns.
+  // 60 % of new letters come from the puzzle to keep the game solvable
+  // while still providing variety. The remaining 40 % are random, which
+  // prevents the game from becoming trivially easy.
   static List<String> refillHandPuzzleAware(
     List<String> currentHand,
     List<WordModel> words,

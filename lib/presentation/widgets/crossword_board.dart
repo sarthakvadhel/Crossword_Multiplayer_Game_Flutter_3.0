@@ -75,6 +75,8 @@ class CrosswordBoard extends StatelessWidget {
     Color bgColor = Colors.white;
     if (tile.isLocked && tile.letter != null) bgColor = AppTheme.tileColor;
     if (!tile.isLocked && tile.letter != null) bgColor = const Color(0xFFFFE082);
+    // Only highlight empty cells: filled cells already have clear visual
+    // feedback from their letter colour, so adding highlight would be confusing.
     if (tile.isHighlighted && tile.letter == null) bgColor = AppTheme.highlightColor;
 
     final numSize = (cellSize * 0.28).clamp(6.0, 11.0);

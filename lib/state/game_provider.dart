@@ -40,6 +40,11 @@ class GameProvider extends ChangeNotifier {
   GameProvider(this._storageService) {
     // Auto-load any saved game so the "Continue Game" button is shown
     // immediately on startup (StorageService.init() has already run).
+    _restoreFromStorage();
+  }
+
+  // ── Private helper to restore state from storage ─────────────────────────
+  void _restoreFromStorage() {
     final saved = _storageService.loadGameState();
     if (saved != null) {
       _gameState = saved;
@@ -65,15 +70,7 @@ class GameProvider extends ChangeNotifier {
       _gameState != null && !(_gameState!.isPuzzleComplete);
 
   /// Returns puzzle words with isCompleted flags set from saved state.
-  List<WordModel> get words {
-    final puzzle = PuzzleRepo.getPuzzle1();
-    if (_gameState != null) {
-      for (final w in puzzle.words) {
-        w.isCompleted = _gameState!.completedWordIds.contains(w.id);
-      }
-    }
-    return puzzle.words;
-  }
+  List<WordModel> get words => _puzzleWordsWithCompletion();
 
   // Initialize new game
   void startNewGame() {
@@ -107,9 +104,8 @@ class GameProvider extends ChangeNotifier {
   // Try to load saved game, returns true if found.
   // If the saved phase is aiTurn, the AI turn is re-triggered automatically.
   bool loadGame() {
-    final saved = _storageService.loadGameState();
-    if (saved != null) {
-      _gameState = saved;
+    _restoreFromStorage();
+    if (_gameState != null) {
       _currentTurnPlacements = [];
       _selectedLetterIndex = -1;
       notifyListeners();
