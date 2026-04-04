@@ -35,7 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
-                        Icons.grid_on_rounded,
+                        Icons.people_rounded,
                         size: 64,
                         color: AppTheme.primaryColor,
                       ),
@@ -58,13 +58,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const Spacer(),
-                    // Continue Game button
+                    // Continue Game button – shown when a game is saved
                     if (gameProvider.hasActiveGame)
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            gameProvider.loadGame();
+                            // loadGame returns false if nothing is on disk;
+                            // in that case, start a fresh game so the screen
+                            // is always interactive.
+                            final loaded = gameProvider.loadGame();
+                            if (!loaded) {
+                              gameProvider.startNewGame();
+                            }
                             Navigator.pushNamed(context, '/game');
                           },
                           icon: const Icon(Icons.play_arrow_rounded),
@@ -109,7 +115,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           label: const Text('Restart Game'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppTheme.primaryColor,
-                            side: const BorderSide(color: AppTheme.primaryColor),
+                            side:
+                                const BorderSide(color: AppTheme.primaryColor),
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
                         ),
@@ -140,7 +147,10 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.grid_on), label: 'Game'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people_rounded),
+            label: 'Multiplayer',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),

@@ -13,6 +13,8 @@ class GameStateModel {
   List<String> moveHistory;
   bool isPuzzleComplete;
   DateTime? lastSaved;
+  // Track which word IDs have already been scored to prevent double-counting.
+  List<int> completedWordIds;
 
   GameStateModel({
     required this.board,
@@ -24,7 +26,9 @@ class GameStateModel {
     List<String>? moveHistory,
     this.isPuzzleComplete = false,
     this.lastSaved,
-  }) : moveHistory = moveHistory ?? [];
+    List<int>? completedWordIds,
+  })  : moveHistory = moveHistory ?? [],
+        completedWordIds = completedWordIds ?? [];
 
   Map<String, dynamic> toJson() {
     return {
@@ -39,6 +43,7 @@ class GameStateModel {
       'moveHistory': moveHistory,
       'isPuzzleComplete': isPuzzleComplete,
       'lastSaved': lastSaved?.toIso8601String(),
+      'completedWordIds': completedWordIds,
     };
   }
 
@@ -62,6 +67,10 @@ class GameStateModel {
       lastSaved: json['lastSaved'] != null
           ? DateTime.parse(json['lastSaved'] as String)
           : null,
+      completedWordIds: (json['completedWordIds'] as List?)
+              ?.map((e) => e as int)
+              .toList() ??
+          [],
     );
   }
 }

@@ -37,7 +37,19 @@ class GameProvider extends ChangeNotifier {
   // Hint positions
   List<List<int>> _hintPositions = [];
 
-  GameProvider(this._storageService);
+  GameProvider(this._storageService) {
+    // Auto-load any saved game so the "Continue Game" button is shown
+    // immediately on startup (StorageService.init() has already run).
+    _restoreFromStorage();
+  }
+
+  // ── Private helper to restore state from storage ─────────────────────────
+  void _restoreFromStorage() {
+    final saved = _storageService.loadGameState();
+    if (saved != null) {
+      _gameState = saved;
+    }
+  }
 
   // Getters
   GameStateModel? get gameState => _gameState;
@@ -56,7 +68,9 @@ class GameProvider extends ChangeNotifier {
   List<List<int>> get hintPositions => _hintPositions;
   bool get hasActiveGame =>
       _gameState != null && !(_gameState!.isPuzzleComplete);
-  List<WordModel> get words => PuzzleRepo.getPuzzle1().words;
+
+  /// Returns puzzle words with isCompleted flags set from saved state.
+  List<WordModel> get words => _puzzleWordsWithCompletion();
 
   // Initialize new game
   void startNewGame() {
@@ -67,12 +81,12 @@ class GameProvider extends ChangeNotifier {
       player: PlayerModel(
         name: 'Player',
         type: PlayerType.human,
-        hand: LetterGenerator.generateHand(),
+        hand: LetterGenerator.generatePuzzleAwareHand(puzzle.words, board),
       ),
       computer: PlayerModel(
         name: 'Computer',
         type: PlayerType.computer,
-        hand: LetterGenerator.generateHand(),
+        hand: LetterGenerator.generatePuzzleAwareHand(puzzle.words, board),
       ),
       phase: GamePhase.playerTurn,
       currentTurn: 1,
@@ -87,14 +101,18 @@ class GameProvider extends ChangeNotifier {
     _saveGame();
   }
 
-  // Try to load saved game, returns true if found
+  // Try to load saved game, returns true if found.
+  // If the saved phase is aiTurn, the AI turn is re-triggered automatically.
   bool loadGame() {
-    final saved = _storageService.loadGameState();
-    if (saved != null) {
-      _gameState = saved;
+    _restoreFromStorage();
+    if (_gameState != null) {
       _currentTurnPlacements = [];
       _selectedLetterIndex = -1;
       notifyListeners();
+      // If the game was saved mid-AI-turn, resume it.
+      if (_gameState!.phase == GamePhase.aiTurn && !_isAiThinking) {
+        _playAiTurn();
+      }
       return true;
     }
     return false;
@@ -140,10 +158,12 @@ class GameProvider extends ChangeNotifier {
     final puzzle = PuzzleRepo.getPuzzle1();
     final completedWords =
         MoveValidator.checkCompletedWords(_gameState!.board, puzzle.words);
-    final newlyCompleted =
-        completedWords.where((w) => !w.isCompleted).toList();
+    // Only score words that haven't been scored before.
+    final newlyCompleted = completedWords
+        .where((w) => !_gameState!.completedWordIds.contains(w.id))
+        .toList();
     for (var w in newlyCompleted) {
-      w.isCompleted = true;
+      _gameState!.completedWordIds.add(w.id);
     }
 
     String? longestCompleted;
@@ -180,8 +200,11 @@ class GameProvider extends ChangeNotifier {
       score: scoreResult.points,
     );
 
-    _gameState!.player.hand =
-        LetterGenerator.refillHand(_gameState!.player.hand);
+    // Refill hand with puzzle-aware letters.
+    _gameState!.player.hand = LetterGenerator.refillHandPuzzleAware(
+        _gameState!.player.hand,
+        _puzzleWordsWithCompletion(),
+        _gameState!.board);
 
     _gameState!.isPuzzleComplete =
         BoardEngine.isPuzzleComplete(_gameState!.board, puzzle.words);
@@ -210,10 +233,23 @@ class GameProvider extends ChangeNotifier {
     notifyListeners();
 
     await Future.delayed(Duration(
-        milliseconds:
-            Helpers.randomInt(GameConstants.aiMinDelay, GameConstants.aiMaxDelay)));
+        milliseconds: Helpers.randomInt(
+            GameConstants.aiMinDelay, GameConstants.aiMaxDelay)));
+
+    // Guard: state may have changed while waiting.
+    if (_gameState == null || _gameState!.phase != GamePhase.aiTurn) {
+      _isAiThinking = false;
+      notifyListeners();
+      return;
+    }
 
     final puzzle = PuzzleRepo.getPuzzle1();
+    // Give the AI puzzle-aware letters before its turn.
+    _gameState!.computer.hand = LetterGenerator.refillHandPuzzleAware(
+        _gameState!.computer.hand,
+        _puzzleWordsWithCompletion(),
+        _gameState!.board);
+
     final move = AiEngine.decideMove(
       board: _gameState!.board,
       words: puzzle.words,
@@ -221,7 +257,8 @@ class GameProvider extends ChangeNotifier {
     );
 
     if (move.isSwap) {
-      _gameState!.computer.hand = LetterGenerator.generateHand();
+      _gameState!.computer.hand = LetterGenerator.generatePuzzleAwareHand(
+          _puzzleWordsWithCompletion(), _gameState!.board);
       _gameState!.moveHistory.add('Computer swapped letters');
       _gameState!.computer.streak = 0;
     } else {
@@ -236,10 +273,11 @@ class GameProvider extends ChangeNotifier {
 
       final completedWords =
           MoveValidator.checkCompletedWords(_gameState!.board, puzzle.words);
-      final newlyCompleted =
-          completedWords.where((w) => !w.isCompleted).toList();
+      final newlyCompleted = completedWords
+          .where((w) => !_gameState!.completedWordIds.contains(w.id))
+          .toList();
       for (var w in newlyCompleted) {
-        w.isCompleted = true;
+        _gameState!.completedWordIds.add(w.id);
       }
 
       String? longestCompleted;
@@ -268,8 +306,10 @@ class GameProvider extends ChangeNotifier {
       _gameState!.moveHistory.add(
           'Computer placed ${move.placements.length} letters (+${scoreResult.points})');
 
-      _gameState!.computer.hand =
-          LetterGenerator.refillHand(_gameState!.computer.hand);
+      _gameState!.computer.hand = LetterGenerator.refillHandPuzzleAware(
+          _gameState!.computer.hand,
+          _puzzleWordsWithCompletion(),
+          _gameState!.board);
     }
 
     _gameState!.isPuzzleComplete =
@@ -364,5 +404,16 @@ class GameProvider extends ChangeNotifier {
     _currentBanner = null;
     _hintPositions = [];
     notifyListeners();
+  }
+
+  // Returns puzzle words with isCompleted flags set from saved state.
+  List<WordModel> _puzzleWordsWithCompletion() {
+    final puzzle = PuzzleRepo.getPuzzle1();
+    if (_gameState != null) {
+      for (final w in puzzle.words) {
+        w.isCompleted = _gameState!.completedWordIds.contains(w.id);
+      }
+    }
+    return puzzle.words;
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../state/game_provider.dart';
 import '../../data/models/game_state_model.dart';
+import '../../data/models/word_model.dart';
 import '../../core/theme/app_theme.dart';
 import '../widgets/crossword_board.dart';
 import '../widgets/hand_letters.dart';
@@ -47,8 +48,8 @@ class _GameScreenState extends State<GameScreen> {
       barrierDismissible: false,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: const [
+        title: const Row(
+          children: [
             Icon(Icons.emoji_events, color: AppTheme.bannerColor, size: 28),
             SizedBox(width: 8),
             Text('Game Over'),
@@ -96,7 +97,8 @@ class _GameScreenState extends State<GameScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+        Text(label,
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
         const SizedBox(height: 4),
         Text('$score',
             style: TextStyle(
@@ -114,6 +116,13 @@ class _GameScreenState extends State<GameScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.list_alt),
+            tooltip: 'View clues',
+            onPressed: () => WordPopup.show(context),
+          ),
+        ],
       ),
       body: Consumer<GameProvider>(
         builder: (context, gameProvider, _) {
@@ -136,26 +145,27 @@ class _GameScreenState extends State<GameScreen> {
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: ScoreDisplay(),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   // Turn indicator
                   const Center(child: TurnIndicator()),
-                  const SizedBox(height: 8),
-                  // Crossword board
+                  const SizedBox(height: 6),
+                  // Crossword board – fills remaining space
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: SingleChildScrollView(
-                        child: const CrosswordBoard(),
-                      ),
+                      child: const CrosswordBoard(),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // Horizontal scrollable clue bar
+                  _ClueBar(),
+                  const SizedBox(height: 6),
                   // Hand letters
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8),
                     child: HandLetters(),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   // Action buttons
                   Padding(
                     padding:
@@ -190,6 +200,7 @@ class _GameScreenState extends State<GameScreen> {
                               ? () => setState(() => _showSwapPanel = true)
                               : null,
                         ),
+  // Fix the icon to match the "Words" label
                         _actionButton(
                           icon: Icons.list_alt,
                           label: 'Words',
@@ -253,6 +264,71 @@ class _GameScreenState extends State<GameScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A compact horizontally-scrolling list of incomplete word clues.
+class _ClueBar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<GameProvider>(
+      builder: (context, gp, _) {
+        final board = gp.board;
+        final allWords = gp.words;
+        if (board.isEmpty) return const SizedBox.shrink();
+
+        final incomplete = allWords.where((w) => !w.isCompleted).toList();
+        if (incomplete.isEmpty) return const SizedBox.shrink();
+
+        return SizedBox(
+          height: 54,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            itemCount: incomplete.length,
+            itemBuilder: (context, i) {
+              final word = incomplete[i];
+              final dir = word.direction == WordDirection.across ? '→' : '↓';
+              final pattern = word.getPattern(board);
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: AppTheme.primaryColor.withOpacity(0.3)),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black12, blurRadius: 3),
+                  ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${word.id}$dir ${word.clue}',
+                      style: TextStyle(
+                          fontSize: 10, color: Colors.grey.shade700),
+                    ),
+                    Text(
+                      pattern,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 3,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
